@@ -113,8 +113,6 @@ def get_QA_chain():
         raise
 
 
-chain = get_QA_chain()
-
 if __name__ == "__main__":
     # create_vector_db(folder_path)
     chain = get_QA_chain()
