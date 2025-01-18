@@ -2,7 +2,6 @@ import streamlit as st
 from helper import get_QA_chain
 from voice import azure_stt, azure_tts
 import time
-import threading
 
 # Initialize QA chain
 chain = get_QA_chain()
@@ -35,7 +34,7 @@ def get_response(question):
     return ans
 
 # Streamlit frontend
-st.title("Voice and Text Chatbot 🌱")
+st.title("The Hunar Foundation Bot")
 st.sidebar.title("Toggle Chat Mode")
 chat_mode = st.sidebar.radio("Select Chat Mode", ("Text Chat", "Voice Chat"))
 
