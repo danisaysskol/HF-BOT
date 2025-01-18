@@ -12,7 +12,6 @@ from load_system_prompt import load_system_prompt
 from langchain_community.document_loaders import TextLoader
 
 import nltk
-import logging
 nltk.download('punkt_tab')
 nltk.download('averaged_perceptron_tagger_eng')
 

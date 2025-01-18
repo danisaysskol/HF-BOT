@@ -1,7 +1,3 @@
-#important funciton
-import logging
-
-logger = logging.getLogger(__name__)
 
 def load_system_prompt() -> str:
     """
