@@ -1,71 +1,65 @@
 import streamlit as st
-from helper import get_QA_chain, folder_path
+from helper import get_QA_chain
 from voice import azure_stt, azure_tts
+import time
+import threading
 
-# Initialize session state variables
-if "answer" not in st.session_state:
-    st.session_state.answer = ""
-if "chat_mode" not in st.session_state:
-    st.session_state.chat_mode = "text"  # Default mode is "text"
-if "question" not in st.session_state:
-    st.session_state.question = ""
-
-# Get QA chain
+# Initialize QA chain
 chain = get_QA_chain()
 
+# Initialize session state variables
+if 'is_voice' not in st.session_state:
+    st.session_state['is_voice'] = False  # Track whether in voice mode
+if 'is_speaking' not in st.session_state:
+    st.session_state['is_speaking'] = False  # Track whether TTS is speaking
+
+# Function to handle voice input (speech-to-text)
+def process_voice_input():
+    st.session_state['is_speaking'] = False
+    audio_file = azure_stt()  # Use the function to get the voice input
+    st.session_state['question'] = audio_file  # Update question from STT
+    st.session_state['is_voice'] = True
+
+    # Process the question and generate response
+    response = get_response(st.session_state['question'])
+    st.session_state['response'] = response["answer"]
+    
+    # Handle TTS (Text-to-Speech) response
+    if st.session_state['is_voice']:
+        azure_tts(st.session_state['response'])
+        st.session_state['is_speaking'] = True
+
 def get_response(question):
-    """
-    Get response from the QA chain.
-    """
     chain = get_QA_chain()
     ans = chain.invoke({"input": question})
     return ans
 
-def voice_chat():
-    """
-    Handle voice chat input and response.
-    """
-    st.write("Voice Chat Mode Active 🎙️")
-    audio_file = st.file_uploader("Upload an audio file for your question (WAV/MP3):")
-    if audio_file:
-        st.write("Processing your audio...")
-        question = azure_stt(audio_file)  # Convert speech to text
-        st.write(f"Detected Question: {question}")
-        st.session_state.question = question
+# Streamlit frontend
+st.title("Voice and Text Chatbot 🌱")
+st.sidebar.title("Toggle Chat Mode")
+chat_mode = st.sidebar.radio("Select Chat Mode", ("Text Chat", "Voice Chat"))
 
-        response = get_response(question)
-        st.session_state.answer = response["answer"]
+# Handle toggle for voice or text chat mode
+if chat_mode == "Text Chat":
+    st.session_state['is_voice'] = False
+    question = st.text_input("Ask a question: ")
 
-        st.write("Answer:")
-        st.write(st.session_state.answer)
-
-        # Convert text answer to speech
-        audio_response = azure_tts(st.session_state.answer)
-        st.audio(audio_response, format="audio/wav")
-
-def text_chat():
-    """
-    Handle text chat input and response.
-    """
-    st.write("Text Chat Mode Active 💬")
-    question = st.text_input("Type your question here:")
     if question:
-        st.session_state.question = question
         response = get_response(question)
-        st.session_state.answer = response["answer"]
-        st.write("Answer:")
-        st.write(st.session_state.answer)
+        st.write(response["answer"])
 
-# Title
-st.title("The Hunar Foundation Chatbot Q&A 🌱")
+else:
+    st.session_state['is_voice'] = True
+    # Display button to start voice processing
+    if st.button("Speak"):
+        st.session_state['is_speaking'] = True
+        process_voice_input()
 
-# Sidebar for mode selection
-st.sidebar.title("Chat Mode")
-mode = st.sidebar.radio("Choose chat mode:", ("text", "voice"))
-st.session_state.chat_mode = mode
+    # Print the transcribed text and stop speaking if new speech is detected
+    if st.session_state.get('question'):
+        st.write(f"Your Question: {st.session_state['question']}")
 
-# Handle mode switching
-if st.session_state.chat_mode == "text":
-    text_chat()
-elif st.session_state.chat_mode == "voice":
-    voice_chat()
+    # Stop TTS if user speaks again or switches to text mode
+    if st.session_state['is_speaking'] and chat_mode == 'Voice Chat' and st.session_state.get('response'):
+        st.session_state['is_speaking'] = False
+        time.sleep(1)  # Wait a moment to ensure TTS is completed before new input
