@@ -5,7 +5,7 @@ import time
 
 # Initialize QA chain
 chain = get_QA_chain()
-
+st.set_option('server.headless', True)
 # Initialize session state variables
 if 'is_voice' not in st.session_state:
     st.session_state['is_voice'] = False  # Track whether in voice mode
