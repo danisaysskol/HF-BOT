@@ -1,132 +1,106 @@
 import streamlit as st
-import whisper
-import sounddevice as sd
-import numpy as np
-import tempfile
-import os
-import wave
-import pygame
-from gtts import gTTS
+from streamlit_mic_recorder import mic_recorder
+from whisper_stt import whisper_stt
 from helper import get_QA_chain
+import os
+import azure.cognitiveservices.speech as speechsdk
+# import requests
+# from io import BytesIO
+# import tempfile
 
-# Load the Whisper model
-model = whisper.load_model("base")
-
-# Initialize the Q&A chain
-chain = get_QA_chain()
 
 def get_response(question):
-    chain = get_QA_chain()
-    ans = chain.invoke({"input": question})
-    return ans
+    """Fetch response from the chatbot chain."""
+    try:
+        chain = get_QA_chain()
+        response = chain.invoke({"input": question})
+        return response
+    except Exception as e:
+        st.error("An error occurred while processing your request.")
+        print(f"Error: {e}")
+        return None
 
-# Function to record audio using sounddevice
-def record_audio(duration=5, fs=16000):
-    """ Record audio and return the audio data and file path """
-    st.info("Recording... Speak now.")
-    
-    # Record audio
-    recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-    sd.wait()  # Wait until the recording is finished
-    
-    # Save to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as f:
-        with wave.open(f, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)  # 2 bytes for int16
-            wf.setframerate(fs)
-            wf.writeframes(recording.tobytes())
-            audio_file_path = f.name
 
-    st.info("Recording complete.")
-    return audio_file_path
+import azure.cognitiveservices.speech as speechsdk
 
-# Function to transcribe audio using Whisper
-def transcribe_audio(audio_file_path):
-    result = model.transcribe(audio_file_path)
-    return result['text']
+def text_to_speech(text):
+    """Convert text to speech using Azure TTS and play the audio."""
+    try:
+        # Fetch Azure credentials from environment variables
+        speech_key = os.getenv("AZURE_SPEECH_KEY")  # Replace with your Azure Speech Key
+        speech_region = os.getenv("AZURE_SPEECH_REGION")  # Replace with your Azure Region
 
-# Function to speak the response using gTTS
-def speak_response(response_text):
-    """ Generate speech from text and play it using gTTS and pygame """
-    # Generate speech using Google Text-to-Speech
-    tts = gTTS(text=response_text, lang='en')
-    
-    # Save the speech to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
-        tts.save(f.name)
-        audio_file_path = f.name
+        # Initialize the Speech SDK
+        speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=speech_region)
+        audio_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
 
-    # Initialize pygame mixer to play the audio
-    pygame.mixer.init()
+        # Set the voice and language
+        speech_config.speech_synthesis_voice_name = "en-US-JennyNeural"  # Change voice as needed
 
-    # Load and play the audio
-    pygame.mixer.music.load(audio_file_path)
-    pygame.mixer.music.play()
+        # Create a synthesizer
+        synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
 
-    # Wait for the audio to finish playing
-    while pygame.mixer.music.get_busy():  # Wait until the music finishes playing
-        pygame.time.Clock().tick(10)
+        # Generate speech
+        result = synthesizer.speak_text_async(text).get()
 
-    # Clean up the audio file after playing
-    os.remove(audio_file_path)
+        # Check result status
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            print("Speech synthesized successfully.")
+        elif result.reason == speechsdk.ResultReason.Canceled:
+            cancellation_details = result.cancellation_details
+            raise Exception(f"Speech synthesis canceled: {cancellation_details.reason}")
+    except Exception as e:
+        st.error("An error occurred while generating audio.")
+        print(f"TTS Error: {e}")
 
-# Streamlit app UI
-st.title("The Hunar Foundation Chatbot Q&A 🌱")
+def main():
+    st.title("The Hunar Foundation Chatbot Q&A 🌱")
 
-# Select mode: Text input or Voice input
-mode = st.radio("Choose input mode:", ("Text", "Voice"))
+    # State initialization
+    if 'last_response' not in st.session_state:
+        st.session_state.last_response = None
+    if 'last_question' not in st.session_state:
+        st.session_state.last_question = None
 
-if mode == "Text":
-    # Text-based input remains unchanged
-    question = st.text_input("Question: ")
-
+    # Text Input Section
+    question = st.text_input("Ask a question (Text Mode):")
     if question:
-        print(question)
+        st.session_state.last_response = None
+        st.session_state.last_question = question
         response = get_response(question)
-        st.header("Answer")
-        st.write(response["answer"])
-        print(response['answer'])
+        if response:
+            st.session_state.last_response = response["answer"]
+            st.header("Answer")
+            st.write(response["answer"])
 
-elif mode == "Voice":
-    # Buttons to start and stop the recording
-    record_button = st.button("Start Recording")
-    stop_button = st.button("Stop Recording")
+    # Voice Input Section
+    st.write("### Or ask a question using your voice:")
+    audio = whisper_stt(
+        openai_api_key=os.getenv("OPENAI_API_KEY"),  # Load API key from .env
+        language="en",
+        start_prompt="Start Recording",
+        stop_prompt="Stop Recording",
+        just_once=True,
+        key="voice_input"
+    )
 
-    # Start recording on button click
-    if record_button:
-        # Record the audio and get the file path
-        audio_file_path = record_audio(duration=5)  # 5 seconds by default
-        st.info(f"Audio recorded and saved at: {audio_file_path}")
+    if audio:
+        st.session_state.last_response = None
+        st.session_state.last_question = audio
+        st.write("Processing your voice input...")
+        response = get_response(audio)
+        if response:
+            st.session_state.last_response = response["answer"]
+            st.header("Answer")
+            st.write(response["answer"])
 
-        # Transcribe the recorded audio
-        transcription = transcribe_audio(audio_file_path)
+    # Listen to Response Section
+    if st.session_state.last_response:
+        if st.button("Listen to Response"):
+            text_to_speech(st.session_state.last_response)
 
-        st.header("You asked:")
-        st.write(transcription)
 
-        # Get the chatbot's response
-        response = get_response(transcription)
-
-        st.header("Answer:")
-        st.write(response["answer"])
-
-        # Save the response for later playback when the user clicks "Listen"
-        st.session_state.response_text = response["answer"]
-        st.session_state.audio_ready = True  # Flag to indicate the response is ready to be spoken
-
-        # Clean up by deleting the temporary audio file
-        os.remove(audio_file_path)
-
-    # Stop recording manually
-    if stop_button:
-        st.info("Recording stopped by user.")
-        sd.stop()  # Stop the audio recording immediately
-
-    # Add a "Listen" button to play the response when the user is ready
-    if "audio_ready" in st.session_state and st.session_state.audio_ready:
-        listen_button = st.button("Listen")
-        
-        if listen_button:
-            speak_response(st.session_state.response_text)
-            st.session_state.audio_ready = False  # Reset the flag after playing the audio
+# Run the main function
+if __name__ == "__main__":
+    main()
+    
