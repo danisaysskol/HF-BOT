@@ -10,10 +10,16 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from load_system_prompt import load_system_prompt
 from langchain_community.document_loaders import TextLoader
-
 import nltk
-nltk.download('punkt_tab')
-nltk.download('averaged_perceptron_tagger_eng')
+from nltk import data
+from os.path import join, isdir
+
+# Check if corpora are already downloaded
+if not isdir(join(data.path[0], 'corpora', 'punkt')):
+    nltk.download('punkt')
+
+if not isdir(join(data.path[0], 'corpora', 'averaged_perceptron_tagger')):
+    nltk.download('averaged_perceptron_tagger')
 
 
 load_dotenv()
