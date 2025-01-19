@@ -28,7 +28,10 @@ def process_voice_input():
         st.session_state['is_speaking'] = True
 
 def get_response(question):
-    chain = get_QA_chain()
+    # chain = get_QA_chain()
+    if "hunar" not in question:
+        question += " hunar"
+    # modified_question = question  + ''
     ans = chain.invoke({"input": question})
     return ans
 
