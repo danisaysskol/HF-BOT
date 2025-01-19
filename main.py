@@ -35,6 +35,8 @@ def process_audio_input(audio_file):
     # Process the question and generate response
     response = get_response(st.session_state['question'])
     st.session_state['response'] = response["answer"]
+    print('Audio User: ', st.session_state['question'])
+    print('Audio Response: ', response['answer'])
 
     # Generate TTS response if in voice mode
     if st.session_state['is_voice']:
@@ -60,6 +62,8 @@ if chat_mode == "Text Chat":
     if question:
         response = get_response(question)
         st.write(response["answer"])
+        print('User: ', question)
+        print('Response: ', response['answer'])
 
 # Voice Chat Mode
 else:
