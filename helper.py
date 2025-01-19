@@ -28,7 +28,7 @@ folder_path= r"/home/danish/Desktop/hf_bot/dataset"
 
 
 llm = ChatOpenAI(
-    model='gpt-4o-mini'
+    model='gpt-4o'
 )
 model_kwargs = {'device': 'cpu'}
 embeddings_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2", model_kwargs=model_kwargs)
