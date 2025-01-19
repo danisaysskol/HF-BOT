@@ -1,6 +1,7 @@
 import os
 import azure.cognitiveservices.speech as speechsdk
 from dotenv import load_dotenv
+from io import BytesIO
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -13,51 +14,53 @@ STT_REGION = os.getenv("AZURE_STT_REGION")
 if not STT_KEY or not STT_REGION:
     raise ValueError("Azure STT API Key or Region is not set properly in the environment variables.")
 
-def azure_stt():
+def azure_stt(audio_file_path):
     """
-    Captures audio from the default microphone and converts it to text using Azure's Speech-to-Text service.
+    Converts audio from a file to text using Azure's Speech-to-Text service.
     """
-    # Configure speech settings for Speech-to-Text
+    # Configure Azure Speech settings
     speech_config = speechsdk.SpeechConfig(subscription=STT_KEY, region=STT_REGION)
-    audio_config = speechsdk.audio.AudioConfig(use_default_microphone=True)
+    audio_config = speechsdk.audio.AudioConfig(filename=audio_file_path)
 
-    # Initialize the recognizer
+    # Initialize speech recognizer
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-
-    print("Please speak your question.")
 
     # Perform speech recognition
     result = recognizer.recognize_once()
 
-    # Handle recognition result
+    # Handle recognition results
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-        print(f"Recognized: {result.text}")
         return result.text
     elif result.reason == speechsdk.ResultReason.NoMatch:
-        print("No speech could be recognized.")
-        return "Sorry, I couldn't hear your question. Please try again."
+        return "Sorry, no speech could be recognized."
     else:
-        print(f"Speech recognition failed: {result.error_details}")
-        return "There was an error processing your speech."
-
-
+        return f"Error: {result.error_details}"
 
 def azure_tts(text):
     """
-    Converts the provided text to speech using Azure's Text-to-Speech service and plays it through the default speaker.
+    Converts text to speech using Azure's Text-to-Speech service and returns the audio data.
     """
-    # Configure speech settings for Text-to-Speech
+    # Configure Azure Speech settings
     speech_config = speechsdk.SpeechConfig(subscription=STT_KEY, region=STT_REGION)
+    speech_config.set_speech_synthesis_output_format(
+        speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3
+    )
 
-    # Create audio output configuration for the default speaker
-    audio_output_config = speechsdk.audio.AudioOutputConfig(use_default_speaker=True)
+    # Specify the output audio file
+    output_file = "output_audio.mp3"
+    audio_config = speechsdk.audio.AudioOutputConfig(filename=output_file)
 
-    # Initialize the synthesizer with the speech and audio configurations
-    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_output_config)
+    # Initialize the synthesizer
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
 
-    # Perform text-to-speech synthesis
-    synthesizer.speak_text_async(text)
+    # Perform the text-to-speech synthesis
+    result = synthesizer.speak_text_async(text).get()
 
-    print(f"Speaking: {text}")
-
-
+    # Handle the result
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        # Read the audio data from the file
+        with open(output_file, "rb") as audio_file:
+            audio_data = audio_file.read()
+        return audio_data
+    else:
+        raise RuntimeError(f"TTS failed: {result.error_details}")
