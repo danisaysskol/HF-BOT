@@ -21,10 +21,9 @@ if not isdir(join(data.path[0], 'corpora', 'punkt')):
 if not isdir(join(data.path[0], 'corpora', 'averaged_perceptron_tagger')):
     nltk.download('averaged_perceptron_tagger')
 
-
 load_dotenv()
 
-folder_path= r"/home/danish/Desktop/hf_bot/dataset"
+folder_path= r"dataset"
 
 
 llm = ChatOpenAI(

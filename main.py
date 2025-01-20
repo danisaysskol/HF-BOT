@@ -1,7 +1,7 @@
 import streamlit as st
 from helper import get_QA_chain
 from voice import azure_stt, azure_tts
-import time
+
 
 # Initialize QA chain
 chain = get_QA_chain()
